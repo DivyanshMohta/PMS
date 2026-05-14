@@ -358,7 +358,7 @@ export default function DashboardLayout() {
               open={Boolean(anchorEl)}
               onClose={() => setAnchorEl(null)}
             >
-              <MenuItem onClick={() => setAnchorEl(null)}>
+              <MenuItem onClick={() => { navigate('/profile'); setAnchorEl(null); }}>
                 <AccountCircleIcon sx={{ mr: 1.5, fontSize: 20 }} /> My Profile
               </MenuItem>
               <Divider />

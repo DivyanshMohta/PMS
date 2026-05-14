@@ -10,6 +10,7 @@ import MyPerformancePage from './pages/MyPerformance';
 import TeamManagementPage from './pages/TeamManagement';
 import DevelopmentPlansPage from './pages/DevelopmentPlans';
 import CompetencyDictionaryPage from './pages/CompetencyDictionary';
+import ProfilePage from './pages/Profile';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
   const { isAuthenticated, hasRole } = useAuth();
@@ -29,6 +30,7 @@ function AppRoutes() {
         <Route path="/team" element={<ProtectedRoute roles={['Admin', 'HR', 'Manager']}><TeamManagementPage /></ProtectedRoute>} />
         <Route path="/development" element={<DevelopmentPlansPage />} />
         <Route path="/competencies" element={<ProtectedRoute roles={['Admin']}><CompetencyDictionaryPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

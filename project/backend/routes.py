@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 from bson import ObjectId
 
 from database import (
@@ -58,6 +58,43 @@ async def login(body: LoginRequest):
 @router.get("/auth/me", tags=["Auth"])
 async def me(current_user: dict = Depends(get_current_user)):
     return {k: v for k, v in current_user.items() if k != "password_hash"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PROFILE (self-service)
+# ══════════════════════════════════════════════════════════════════════════════
+@router.get("/profile/me", tags=["Profile"])
+async def get_my_profile(current_user: dict = Depends(get_current_user)):
+    """Return the authenticated user's own profile (no password hash)."""
+    return {k: v for k, v in current_user.items() if k != "password_hash"}
+
+
+@router.patch("/profile/me", tags=["Profile"])
+async def update_my_profile(
+    body: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Allow any authenticated user to update their own name, email, or title."""
+    allowed_fields = {"name", "email", "title"}
+    updates = {k: v for k, v in body.items() if k in allowed_fields and v is not None}
+
+    if not updates:
+        raise HTTPException(status_code=422, detail="No valid fields to update")
+
+    collection = users_collection()
+
+    # If email is being changed, ensure it's not already taken
+    if "email" in updates and updates["email"] != current_user.get("email"):
+        existing = await collection.find_one({"email": updates["email"]})
+        if existing:
+            raise HTTPException(status_code=409, detail="Email already in use by another account")
+
+    user_oid = ObjectId(current_user["_id"])
+    await collection.find_one_and_update({"_id": user_oid}, {"$set": updates})
+    updated = await collection.find_one({"_id": user_oid}, {"password_hash": 0})
+    if not updated:
+        raise HTTPException(status_code=404, detail="User record not found in database — please re-seed.")
+    return _serialize(updated)  # type: ignore
 
 
 # ══════════════════════════════════════════════════════════════════════════════
