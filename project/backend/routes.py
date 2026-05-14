@@ -196,13 +196,15 @@ async def list_reviews(
 
 
 @router.post("/reviews", status_code=201, tags=["Reviews"])
-async def create_review(body: ReviewCreate, _: dict = Depends(admin_hr_manager)):
+async def create_review(body: ReviewCreate, current_user: dict = Depends(admin_hr_manager)):
     from datetime import datetime
     collection = reviews_collection()
     doc = body.model_dump()
     doc["created_at"] = datetime.utcnow()
+    print(f"[REVIEWS] Creating review for employee={doc.get('employee_id')} period={doc.get('period')} by user={current_user.get('_id')}")
     result = await collection.insert_one(doc)
     created = await collection.find_one({"_id": result.inserted_id})
+    print(f"[REVIEWS] Saved with _id={result.inserted_id}")
     return _serialize(created)  # type: ignore
 
 

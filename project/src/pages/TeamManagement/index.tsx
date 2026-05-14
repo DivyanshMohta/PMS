@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Paper,
@@ -21,26 +21,35 @@ import {
   IconButton,
   Tooltip,
   Divider,
+  Snackbar,
+  Alert,
+  CircularProgress,
+  Rating,
 } from "@mui/material";
 import { DataGrid, GridColDef, GridRenderCellParams } from "@mui/x-data-grid";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
-import PersonIcon from "@mui/icons-material/Person";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import {
   MOCK_USERS,
   MOCK_REVIEWS,
   MOCK_DEVELOPMENT_PLANS,
+  type Review,
 } from "../../mock/data";
+import apiClient from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 
 type EmployeeRow = {
   id: string;
+  originalId: string;
   name: string;
   title: string;
   department: string;
   reviewStatus: string;
+  reviewPeriod: string;
   reviewScore: number | null;
   planProgress: number | null;
   avatar: string;
@@ -55,33 +64,193 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 };
 
 export default function TeamManagementPage() {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeRow | null>(
-    null,
-  );
+  const [periodFilter, setPeriodFilter] = useState("All");
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeRow | null>(null);
   const [createReviewOpen, setCreateReviewOpen] = useState(false);
-  const [newReview, setNewReview] = useState({
-    employeeId: "",
-    period: "H1 2025",
-    notes: "",
+  const [submitting, setSubmitting] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false, message: "", severity: "success",
+  });
+  const [newReview, setNewReview] = useState<{
+    employeeId: string;
+    period: string;
+    notes: string;
+    projects: { id: string; name: string; score: number }[];
+  }>({ employeeId: "", period: "H1 2025", notes: "", projects: [] });
+
+  // Local reviews state — starts from mock data, updated when new reviews are created
+  const [localReviews, setLocalReviews] = useState<Review[]>(() => {
+    const saved = localStorage.getItem('hrms_reviews_fallback');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return [...MOCK_REVIEWS];
   });
 
-  const employees = MOCK_USERS.filter((u) => u.role === "Employee").map((u) => {
-    const review = MOCK_REVIEWS.find((r) => r.employeeId === u.id);
+  useEffect(() => {
+    // Fetch real reviews from the backend and merge with mock data
+    apiClient.get("/reviews?limit=100").then((res) => {
+      if (res.data?.items) {
+        const backendReviews = res.data.items.map((item: any) => ({
+          id: item._id,
+          employeeId: item.employee_id,
+          employeeName: item.employee_name,
+          reviewerId: item.reviewer_id,
+          reviewerName: item.reviewer_name,
+          period: item.period,
+          status: item.status,
+          overallScore: item.overall_score,
+          goals: item.goals || [],
+          competencyScores: item.competency_scores || [],
+        }));
+        
+        setLocalReviews((prev) => {
+          const merged = [...backendReviews];
+          prev.forEach((mockReview) => {
+            if (!merged.find(r => r.employeeId === mockReview.employeeId && r.period === mockReview.period)) {
+              merged.push(mockReview);
+            }
+          });
+          localStorage.setItem('hrms_reviews_fallback', JSON.stringify(merged));
+          return merged;
+        });
+      }
+    }).catch((err) => {
+      console.error("Failed to load backend reviews:", err);
+      // Fallback already loaded from localStorage
+    });
+  }, []);
+
+  const periods = ["H1 2025", "H2 2025", "H1 2024", "H2 2024"];
+
+  const employees = MOCK_USERS.filter((u) => {
+    if (u.role !== "Employee") return false;
+    if (user?.role === "Manager") {
+      return u.managerId === user.id;
+    }
+    return true; // Admin and HR see all employees
+  }).flatMap((u) => {
     const plan = MOCK_DEVELOPMENT_PLANS.find((p) => p.employeeId === u.id);
-    return {
-      id: u.id,
-      name: u.name,
-      title: u.title,
-      department: u.department,
-      reviewStatus: review?.status || "No Review",
-      reviewScore: review?.overallScore || null,
-      planProgress: plan?.overallProgress ?? null,
-      avatar: u.avatar,
-    };
+    
+    return periods.map((period) => {
+      // Find the specific review for this employee and period
+      const review = localReviews.find((r) => r.employeeId === u.id && r.period === period);
+      
+      return {
+        id: `${u.id}_${period}`,
+        originalId: u.id,
+        name: u.name,
+        title: u.title,
+        department: u.department,
+        reviewStatus: review?.status || "No Review",
+        reviewPeriod: period,
+        reviewScore: review?.overallScore || null,
+        planProgress: plan?.overallProgress ?? null,
+        avatar: u.avatar,
+      };
+    });
   });
+
+  const handleCreateReview = async () => {
+    if (!newReview.employeeId) {
+      setSnackbar({ open: true, message: "Please select an employee.", severity: "error" });
+      return;
+    }
+    setSubmitting(true);
+
+    const employee = MOCK_USERS.find((u) => u.id === newReview.employeeId);
+    const reviewer = user;
+
+    const avgScore = newReview.projects.length > 0
+      ? newReview.projects.reduce((acc, curr) => acc + curr.score, 0) / newReview.projects.length
+      : 0;
+    const finalScore = Number(avgScore.toFixed(1));
+
+    const mappedGoals = newReview.projects.map(p => ({
+      id: p.id,
+      title: p.name,
+      description: `Score: ${p.score} stars`,
+      progress: 100,
+      dueDate: new Date().toISOString().split('T')[0],
+      status: "Completed" as const,
+      weight: 0
+    }));
+
+    // Build a local review object to add to state immediately
+    const localEntry: Review = {
+      id: `r_local_${Date.now()}`,
+      employeeId: newReview.employeeId,
+      employeeName: employee?.name ?? "",
+      reviewerId: reviewer?.id ?? "unknown",
+      reviewerName: reviewer?.name ?? "Unknown",
+      period: newReview.period,
+      status: "Completed",
+      overallScore: finalScore,
+      goals: mappedGoals,
+      competencyScores: [],
+    };
+
+    // 1. Save to backend first, then update UI
+    try {
+      await apiClient.post("/reviews", {
+        employee_id: newReview.employeeId,
+        employee_name: employee?.name ?? "",
+        reviewer_id: reviewer?.id ?? "",
+        reviewer_name: reviewer?.name ?? "",
+        period: newReview.period,
+        status: "Completed",
+        overall_score: finalScore,
+        goals: newReview.projects.map(p => ({
+          id: p.id,
+          title: p.name,
+          description: `Score: ${p.score} stars`,
+          progress: 100,
+          due_date: new Date().toISOString().split('T')[0],
+          status: "Completed",
+          weight: 0
+        })),
+        competency_scores: [],
+        notes: newReview.notes,
+      });
+
+      // 2. Update local state for immediate UI feedback only if backend succeeds
+      setLocalReviews((prev) => {
+        const next = [localEntry, ...prev];
+        localStorage.setItem('hrms_reviews_fallback', JSON.stringify(next));
+        return next;
+      });
+      setCreateReviewOpen(false);
+      setNewReview({ employeeId: "", period: "H1 2025", notes: "", projects: [] });
+      setSnackbar({ open: true, message: `Review saved to hrms_db for ${employee?.name}`, severity: "success" });
+      setSubmitting(false);
+
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      const msg = detail ? JSON.stringify(detail) : err?.message;
+      console.error("[Review] Backend save failed:", msg);
+      
+      // FALLBACK: If DB fails, save locally so the app keeps working!
+      setLocalReviews((prev) => {
+        const next = [localEntry, ...prev];
+        localStorage.setItem('hrms_reviews_fallback', JSON.stringify(next));
+        return next;
+      });
+      
+      setCreateReviewOpen(false);
+      setNewReview({ employeeId: "", period: "H1 2025", notes: "", projects: [] });
+      setSnackbar({ 
+        open: true, 
+        message: `Saved Locally (Database Error: ${msg})`, 
+        severity: "warning" 
+      });
+      setSubmitting(false);
+    }
+  };
+
 
   const departments = [
     "All",
@@ -92,7 +261,6 @@ export default function TeamManagementPage() {
     "Completed",
     "Acknowledged",
     "In Progress",
-    "Draft",
     "No Review",
   ];
 
@@ -103,7 +271,9 @@ export default function TeamManagementPage() {
     const matchDept = deptFilter === "All" || e.department === deptFilter;
     const matchStatus =
       statusFilter === "All" || e.reviewStatus === statusFilter;
-    return matchSearch && matchDept && matchStatus;
+    const matchPeriod = 
+      periodFilter === "All" || e.reviewPeriod === periodFilter;
+    return matchSearch && matchDept && matchStatus && matchPeriod;
   });
 
   const columns: GridColDef[] = [
@@ -111,35 +281,55 @@ export default function TeamManagementPage() {
       field: "name",
       headerName: "Employee",
       flex: 1,
-      minWidth: 200,
+      minWidth: 220,
       renderCell: (params: GridRenderCellParams) => (
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
             gap: 1.5,
+            width: "100%",
             height: "100%",
+            overflow: "visible",
           }}
         >
           <Avatar
             sx={{
-              width: 32,
-              height: 32,
+              width: 34,
+              height: 34,
               bgcolor: "#1a3a5c",
               fontSize: 12,
               fontWeight: 700,
+              flexShrink: 0,
             }}
           >
             {params.row.avatar}
           </Avatar>
-          <Box>
+          <Box sx={{ minWidth: 0 }}>
             <Typography
               variant="body2"
-              sx={{ fontWeight: 600, color: "#0f172a", lineHeight: 1.2 }}
+              sx={{
+                fontWeight: 600,
+                color: "#0f172a",
+                lineHeight: 1.3,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
             >
               {params.value}
             </Typography>
-            <Typography variant="caption" sx={{ color: "#64748b" }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "#64748b",
+                lineHeight: 1.3,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                display: "block",
+              }}
+            >
               {params.row.title}
             </Typography>
           </Box>
@@ -156,6 +346,16 @@ export default function TeamManagementPage() {
           size="small"
           sx={{ bgcolor: "#f1f5f9", color: "#475569", fontSize: 12 }}
         />
+      ),
+    },
+    {
+      field: "reviewPeriod",
+      headerName: "Period",
+      width: 100,
+      renderCell: (p: GridRenderCellParams) => (
+        <Typography variant="body2" sx={{ color: "#475569", fontWeight: 500 }}>
+          {p.value}
+        </Typography>
       ),
     },
     {
@@ -314,7 +514,7 @@ export default function TeamManagementPage() {
         {[
           {
             label: "Total Employees",
-            value: employees.length,
+            value: MOCK_USERS.filter((u) => u.role === "Employee").length,
             color: "#1a3a5c",
           },
           {
@@ -332,9 +532,7 @@ export default function TeamManagementPage() {
           },
           {
             label: "Pending Start",
-            value: employees.filter((e) =>
-              ["Draft", "No Review"].includes(e.reviewStatus),
-            ).length,
+            value: employees.filter((e) => e.reviewStatus === "No Review").length,
             color: "#f59e0b",
           },
         ].map((s) => (
@@ -413,21 +611,40 @@ export default function TeamManagementPage() {
               ))}
             </Select>
           </FormControl>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Period</InputLabel>
+            <Select
+              value={periodFilter}
+              label="Period"
+              onChange={(e) => setPeriodFilter(e.target.value)}
+            >
+              {["All", ...periods].map((p) => (
+                <MenuItem key={p} value={p}>
+                  {p}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Box>
       </Paper>
 
-      <Paper sx={{ height: 500 }}>
+      <Paper sx={{ height: 520 }}>
         <DataGrid
           rows={filtered}
           columns={columns}
-          rowHeight={60}
-          pageSizeOptions={[5, 10, 25]}
-          initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+          rowHeight={72}
+          pageSizeOptions={[5, 10, 25, 50]}
+          initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
           disableRowSelectionOnClick
           sx={{
             border: "none",
             "& .MuiDataGrid-columnHeaders": { bgcolor: "#f8fafc" },
-            "& .MuiDataGrid-cell": { borderColor: "#f1f5f9" },
+            "& .MuiDataGrid-cell": {
+              borderColor: "#f1f5f9",
+              display: "flex",
+              alignItems: "center",
+            },
+            "& .MuiDataGrid-row": { alignItems: "center" },
           }}
         />
       </Paper>
@@ -568,10 +785,20 @@ export default function TeamManagementPage() {
                 variant="contained"
                 startIcon={<EditIcon />}
                 onClick={() => {
-                  setNewReview((p) => ({
-                    ...p,
-                    employeeId: selectedEmployee.id,
-                  }));
+                  const empId = selectedEmployee.originalId;
+                  const pastReview = localReviews.find(r => r.employeeId === empId);
+                  const initialProjects = pastReview?.goals.map(g => ({
+                    id: g.id,
+                    name: g.title,
+                    score: 0
+                  })) || [];
+                  
+                  setNewReview({
+                    employeeId: empId,
+                    period: selectedEmployee.reviewPeriod,
+                    notes: "",
+                    projects: initialProjects
+                  });
                   setSelectedEmployee(null);
                   setCreateReviewOpen(true);
                 }}
@@ -601,9 +828,16 @@ export default function TeamManagementPage() {
               <Select
                 value={newReview.employeeId}
                 label="Employee"
-                onChange={(e) =>
-                  setNewReview((p) => ({ ...p, employeeId: e.target.value }))
-                }
+                onChange={(e) => {
+                  const empId = e.target.value;
+                  const pastReview = localReviews.find(r => r.employeeId === empId);
+                  const initialProjects = pastReview?.goals.map(g => ({
+                    id: g.id,
+                    name: g.title,
+                    score: 0
+                  })) || [];
+                  setNewReview((p) => ({ ...p, employeeId: empId, projects: initialProjects }));
+                }}
               >
                 {MOCK_USERS.filter((u) => u.role === "Employee").map((u) => (
                   <MenuItem key={u.id} value={u.id}>
@@ -621,7 +855,7 @@ export default function TeamManagementPage() {
                   setNewReview((p) => ({ ...p, period: e.target.value }))
                 }
               >
-                {["H1 2025", "H2 2025", "H1 2024", "H2 2024"].map((p) => (
+                {periods.map((p) => (
                   <MenuItem key={p} value={p}>
                     {p}
                   </MenuItem>
@@ -631,13 +865,66 @@ export default function TeamManagementPage() {
             <TextField
               label="Initial Notes"
               multiline
-              rows={3}
+              rows={2}
               fullWidth
               value={newReview.notes}
               onChange={(e) =>
                 setNewReview((p) => ({ ...p, notes: e.target.value }))
               }
             />
+
+            <Box sx={{ mt: 1 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Projects & Ratings</Typography>
+                <Button 
+                  size="small" 
+                  startIcon={<AddIcon />} 
+                  onClick={() => {
+                    setNewReview(p => ({
+                      ...p, 
+                      projects: [...p.projects, { id: Date.now().toString(), name: "", score: 0 }]
+                    }));
+                  }}
+                >
+                  Add Project
+                </Button>
+              </Box>
+              
+              {newReview.projects.map((proj, idx) => (
+                <Box key={proj.id} sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 1.5 }}>
+                  <TextField 
+                    size="small" 
+                    placeholder="Project Name"
+                    value={proj.name}
+                    onChange={(e) => {
+                      const updated = [...newReview.projects];
+                      updated[idx].name = e.target.value;
+                      setNewReview(p => ({ ...p, projects: updated }));
+                    }}
+                    sx={{ flex: 1 }}
+                  />
+                  <Rating 
+                    value={proj.score}
+                    onChange={(_, val) => {
+                      const updated = [...newReview.projects];
+                      updated[idx].score = val || 0;
+                      setNewReview(p => ({ ...p, projects: updated }));
+                    }}
+                  />
+                  <IconButton size="small" color="error" onClick={() => {
+                    const updated = newReview.projects.filter(p => p.id !== proj.id);
+                    setNewReview(p => ({ ...p, projects: updated }));
+                  }}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+              {newReview.projects.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
+                  No projects added yet. Click "Add Project" to include them in the review.
+                </Typography>
+              )}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
@@ -649,12 +936,30 @@ export default function TeamManagementPage() {
           </Button>
           <Button
             variant="contained"
-            onClick={() => setCreateReviewOpen(false)}
+            disabled={submitting}
+            startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : undefined}
+            onClick={handleCreateReview}
           >
-            Create Review
+            {submitting ? "Creating…" : "Create Review"}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success / Error Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          sx={{ borderRadius: 2, fontWeight: 500 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

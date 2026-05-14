@@ -133,10 +133,11 @@ class ReviewBase(BaseModel):
     reviewer_id: str
     reviewer_name: str
     period: str
-    status: ReviewStatus = ReviewStatus.Draft
+    status: ReviewStatus = ReviewStatus.Completed
     overall_score: float = Field(ge=0, le=5, default=0)
     goals: List[Goal] = []
     competency_scores: List[CompetencyScore] = []
+    notes: str = ""
 
 
 class ReviewCreate(ReviewBase):
