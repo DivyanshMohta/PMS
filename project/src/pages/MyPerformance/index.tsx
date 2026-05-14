@@ -99,6 +99,18 @@ export default function MyPerformancePage() {
         <Tab label="Feedback Log" />
       </Tabs>
 
+      {/* Current Review Tab — empty state */}
+      {tab === 0 && !latestReview && (
+        <Paper sx={{ p: 5, textAlign: "center" }}>
+          <Typography variant="h6" sx={{ color: "#94a3b8", fontWeight: 500 }}>
+            No performance review found.
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#cbd5e1", mt: 1 }}>
+            Your manager hasn't created a review for you yet.
+          </Typography>
+        </Paper>
+      )}
+
       {/* Current Review Tab */}
       {tab === 0 && latestReview && (
         <Grid container spacing={2.5}>
@@ -455,8 +467,20 @@ export default function MyPerformancePage() {
         </Grid>
       )}
 
+      {/* Goals Tab — empty state */}
+      {tab === 2 && !latestReview && (
+        <Paper sx={{ p: 5, textAlign: "center" }}>
+          <Typography variant="h6" sx={{ color: "#94a3b8", fontWeight: 500 }}>
+            No goals found.
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#cbd5e1", mt: 1 }}>
+            Goals are created as part of your performance review.
+          </Typography>
+        </Paper>
+      )}
+
       {/* Goals Tab */}
-      {tab === 2 && (
+      {tab === 2 && latestReview && (
         <Box>
           <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
             <Button
@@ -620,7 +644,7 @@ export default function MyPerformancePage() {
                       lineHeight: 1.6,
                     }}
                   >
-                    "{f.message}"
+                    &ldquo;{f.message}&rdquo;
                   </Typography>
                 </Box>
               </Box>
@@ -635,7 +659,7 @@ export default function MyPerformancePage() {
         onClose={() => setAddGoalOpen(false)}
         maxWidth="sm"
         fullWidth
-        paperprops={{ sx: { borderRadius: 3 } }}
+        PaperProps={{ sx: { borderRadius: 3 } }}
       >
         <DialogTitle sx={{ fontWeight: 700 }}>Add New Goal</DialogTitle>
         <DialogContent>

@@ -9,7 +9,13 @@ import LockIcon from '@mui/icons-material/Lock';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { useAuth } from '../../context/AuthContext';
-import { DEMO_ACCOUNTS } from '../../mock/data';
+
+const DEMO_ACCOUNTS = [
+  { email: 'admin@hrms.com', password: 'admin123', role: 'Admin' },
+  { email: 'hr@hrms.com', password: 'hr123', role: 'HR' },
+  { email: 'manager@hrms.com', password: 'manager123', role: 'Manager' },
+  { email: 'employee@hrms.com', password: 'employee123', role: 'Employee' },
+];
 
 export default function LoginPage() {
   const { login } = useAuth();
