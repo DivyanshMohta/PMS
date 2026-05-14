@@ -577,13 +577,13 @@ export default function DevelopmentPlansPage() {
               >
                 Close
               </Button>
-              <Button
+              {/* <Button
                 variant="contained"
                 startIcon={<EditIcon />}
                 onClick={() => setSelectedPlan(null)}
               >
                 Edit Plan
-              </Button>
+              </Button> */}
             </DialogActions>
           </>
         )}
