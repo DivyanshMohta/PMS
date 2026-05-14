@@ -188,9 +188,12 @@ function PlanCard({
           <Box>
             <Typography
               variant="h6"
-              sx={{ fontWeight: 700, color: "#0f172a", fontSize: 16 }}
+              sx={{ fontWeight: 700, color: "#0f172a", fontSize: 16, mb: 0.5 }}
             >
               {plan.title}
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: "#1a3a5c", mb: 0.5 }}>
+              {plan.employeeName}
             </Typography>
             <Typography variant="caption" sx={{ color: "#64748b" }}>
               Target: {plan.targetRole}
