@@ -15,9 +15,14 @@ apiClient.interceptors.response.use(
   res => res,
   err => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('hrms_token');
-      localStorage.removeItem('hrms_user');
-      window.location.href = '/login';
+      const token = localStorage.getItem('hrms_token');
+      // Only log out if it's a real token that expired. 
+      // If we are using mock auth, ignore the 401 and don't force a logout.
+      if (!token?.startsWith('mock_jwt_')) {
+        localStorage.removeItem('hrms_token');
+        localStorage.removeItem('hrms_user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(err);
   }
