@@ -39,8 +39,8 @@ import {
   MOCK_DEVELOPMENT_PLANS,
   type Review,
 } from "../../mock/data";
-import apiClient from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
+import apiClient from "../../api/client";
 
 type EmployeeRow = {
   id: string;
@@ -90,6 +90,11 @@ export default function TeamManagementPage() {
     }
     return [...MOCK_REVIEWS];
   });
+  const [employees, setEmployees] = useState<EmployeeRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const periods = ["H1 2025", "H2 2025", "H1 2024", "H2 2024"];
 
   useEffect(() => {
     // Fetch real reviews from the backend and merge with mock data
@@ -123,37 +128,59 @@ export default function TeamManagementPage() {
       console.error("Failed to load backend reviews:", err);
       // Fallback already loaded from localStorage
     });
-  }, []);
 
-  const periods = ["H1 2025", "H2 2025", "H1 2024", "H2 2024"];
+    // Fetch employees from backend
+    fetchEmployees();
+  }, [user]);
 
-  const employees = MOCK_USERS.filter((u) => {
-    if (u.role !== "Employee") return false;
-    if (user?.role === "Manager") {
-      return u.managerId === user.id;
-    }
-    return true; // Admin and HR see all employees
-  }).flatMap((u) => {
-    const plan = MOCK_DEVELOPMENT_PLANS.find((p) => p.employeeId === u.id);
-    
-    return periods.map((period) => {
-      // Find the specific review for this employee and period
-      const review = localReviews.find((r) => r.employeeId === u.id && r.period === period);
+  async function fetchEmployees() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get('/users?limit=100');
+      const allUsers = res.data?.items || [];
       
-      return {
-        id: `${u.id}_${period}`,
-        originalId: u.id,
-        name: u.name,
-        title: u.title,
-        department: u.department,
-        reviewStatus: review?.status || "No Review",
-        reviewPeriod: period,
-        reviewScore: review?.overallScore || null,
-        planProgress: plan?.overallProgress ?? null,
-        avatar: u.avatar,
-      };
-    });
-  });
+      // Filter based on user role
+      let filteredUsers = allUsers;
+      if (user?.role === 'Manager') {
+        // Manager sees only their direct reports
+        filteredUsers = allUsers.filter((u: any) => u.manager_id === user._id);
+      } else {
+        // HR/Admin sees all employees (non-HR, non-Admin)
+        filteredUsers = allUsers.filter((u: any) => u.role === 'Employee' || u.role === 'Manager');
+      }
+
+      // Map to EmployeeRow format with review/plan data
+      const mapped = filteredUsers.flatMap((u: any) => {
+        const plan = MOCK_DEVELOPMENT_PLANS.find((p) => p.employeeId === u._id);
+        
+        return periods.map((period) => {
+          const review = localReviews.find((r) => r.employeeId === u._id && r.period === period);
+          
+          return {
+            id: `${u._id}_${period}`,
+            originalId: u._id,
+            name: u.name,
+            title: u.title,
+            department: u.department,
+            reviewStatus: review?.status || "No Review",
+            reviewPeriod: period,
+            reviewScore: review?.overallScore || null,
+            planProgress: plan?.overallProgress ?? null,
+            avatar: (u.name?.split(' ').map((n: string) => n[0]).join('') || 'U').toUpperCase(),
+          };
+        });
+      });
+      setEmployees(mapped);
+    } catch (err: any) {
+      const msg = typeof err?.response?.data?.detail === 'string' 
+        ? err.response.data.detail 
+        : (err?.message || 'Failed to fetch employees');
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const handleCreateReview = async () => {
     if (!newReview.employeeId) {
@@ -479,7 +506,22 @@ export default function TeamManagementPage() {
   ];
 
   return (
+    
     <Box>
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <CircularProgress />
+        </Box>
+      )}
+      
+      {error && !loading && (
+        <Paper sx={{ p: 2, mb: 2, bgcolor: '#fee2e2', borderLeft: '4px solid #dc2626' }}>
+          <Typography sx={{ color: '#991b1b' }}>Error: {error}</Typography>
+        </Paper>
+      )}
+
+      {!loading && !error && (
+      <Box>
       <Box
         sx={{
           mb: 3,
@@ -492,11 +534,12 @@ export default function TeamManagementPage() {
       >
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700, color: "#0f172a" }}>
-            Team Management
+            {user?.role === 'Manager' ? 'My Team' : 'Team Management'}
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b" }}>
-            Manage employee reviews, track performance, and monitor development
-            plans
+            {user?.role === 'Manager' 
+              ? 'View your direct reports and manage their performance'
+              : 'Manage employee reviews, track performance, and monitor development plans'}
           </Typography>
         </Box>
         <Button
@@ -513,8 +556,8 @@ export default function TeamManagementPage() {
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {[
           {
-            label: "Total Employees",
-            value: MOCK_USERS.filter((u) => u.role === "Employee").length,
+            label: user?.role === 'Manager' ? 'Direct Reports' : 'Total Employees',
+            value: [...new Set(employees.map(e => e.originalId))].length,
             color: "#1a3a5c",
           },
           {
@@ -839,7 +882,7 @@ export default function TeamManagementPage() {
                   setNewReview((p) => ({ ...p, employeeId: empId, projects: initialProjects }));
                 }}
               >
-                {MOCK_USERS.filter((u) => u.role === "Employee").map((u) => (
+                {employees.map((u) => (
                   <MenuItem key={u.id} value={u.id}>
                     {u.name} — {u.title}
                   </MenuItem>
@@ -944,7 +987,6 @@ export default function TeamManagementPage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Success / Error Snackbar */}
       <Snackbar
         open={snackbar.open}
@@ -960,6 +1002,8 @@ export default function TeamManagementPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+      </Box>
+      )}
     </Box>
   );
 }

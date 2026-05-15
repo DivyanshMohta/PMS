@@ -26,6 +26,8 @@ import {
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import GroupIcon from "@mui/icons-material/Group";
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import SupervisedUserCircleIcon from '@mui/icons-material/SupervisedUserCircle';
 import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import NotificationsIcon from "@mui/icons-material/Notifications";
@@ -56,6 +58,18 @@ const NAV_ITEMS = [
     icon: <GroupIcon />,
     path: "/team",
     roles: ["Admin", "HR", "Manager"],
+  },
+  {
+    label: "New Employee",
+    icon: <PersonAddIcon />,
+    path: "/new-employee",
+    roles: ["HR"],
+  },
+  {
+    label: "Assign Manager",
+    icon: <SupervisedUserCircleIcon />,
+    path: "/assign-manager",
+    roles: ["HR"],
   },
   {
     label: "Development Plans",

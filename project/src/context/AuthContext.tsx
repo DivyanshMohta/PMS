@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import type { UserRole } from '../mock/data';
 import { MOCK_USERS, DEMO_ACCOUNTS } from '../mock/data';
+import apiClient from '../api/client';
 
 export interface AuthUser {
   _id: string;
@@ -64,18 +65,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('hrms_token'));
 
   const login = useCallback(async (email: string, password: string) => {
-    // Use mock credentials (no backend required for login)
-    const account = DEMO_ACCOUNTS.find((a) => a.email === email && a.password === password);
-    if (!account) throw new Error('Invalid credentials');
-    const foundUser = MOCK_USERS.find((u) => u.email === email);
-    if (!foundUser) throw new Error('User not found');
-
-    const mockToken = `mock_jwt_${foundUser.id}_${Date.now()}`;
-    const authUser = normalizeUser({ ...foundUser, _id: foundUser.id });
-    setUser(authUser);
-    setToken(mockToken);
-    localStorage.setItem('hrms_user', JSON.stringify(authUser));
-    localStorage.setItem('hrms_token', mockToken);
+    // Try backend authentication first
+    try {
+      const res = await apiClient.post('/auth/login', { email, password });
+      const token = res.data?.access_token;
+      const user = res.data?.user;
+      if (!token || !user) throw new Error('Invalid login response');
+      const authUser = normalizeUser(user);
+      setUser(authUser);
+      setToken(token);
+      localStorage.setItem('hrms_user', JSON.stringify(authUser));
+      localStorage.setItem('hrms_token', token);
+      return;
+    } catch (err) {
+      // Fallback to local demo accounts for offline/demo mode
+      const account = DEMO_ACCOUNTS.find(a => a.email === email && a.password === password);
+      if (!account) throw err; // return the backend error to the caller
+      const foundUser = MOCK_USERS.find(u => u.email === email);
+      if (!foundUser) throw new Error('User not found');
+      const mockToken = `mock_jwt_${foundUser.id}_${Date.now()}`;
+      const authUser = normalizeUser({ ...foundUser, _id: foundUser.id });
+      setUser(authUser);
+      setToken(mockToken);
+      localStorage.setItem('hrms_user', JSON.stringify(authUser));
+      localStorage.setItem('hrms_token', mockToken);
+    }
   }, []);
 
   const logout = useCallback(() => {
