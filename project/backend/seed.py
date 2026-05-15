@@ -27,7 +27,7 @@ async def seed():
 
     # Users
     users = [
-        {"name": "Alexandra Chen", "email": "admin@hrms.com", "password_hash": pwd_context.hash("admin123"), "role": "Admin", "department": "HR", "title": "HR Director"},
+        {"name": "Alexandra Chen", "email": "admin@hrms.com", "password_hash": pwd_context.hash("admin123"), "role": "HR", "department": "HR", "title": "HR Director"},
         {"name": "Marcus Thompson", "email": "hr@hrms.com", "password_hash": pwd_context.hash("hr123"), "role": "HR", "department": "HR", "title": "HR Business Partner"},
         {"name": "Sarah Williams", "email": "manager@hrms.com", "password_hash": pwd_context.hash("manager123"), "role": "Manager", "department": "Engineering", "title": "Engineering Manager"},
         {"name": "James Okafor", "email": "employee@hrms.com", "password_hash": pwd_context.hash("employee123"), "role": "Employee", "department": "Engineering", "title": "Senior Software Engineer"},

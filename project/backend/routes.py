@@ -6,17 +6,19 @@ from bson import ObjectId
 from database import (
     users_collection, reviews_collection,
     competencies_collection, development_plans_collection,
+    goals_collection,
 )
 from models import (
     UserCreate, UserUpdate, UserResponse,
     ReviewCreate, ReviewUpdate, ReviewResponse,
     CompetencyCreate, CompetencyUpdate, CompetencyResponse,
     DevelopmentPlanCreate, DevelopmentPlanUpdate, DevelopmentPlanResponse,
+    EmployeeGoalCreate, EmployeeGoalUpdate, EmployeeGoalResponse,
     LoginRequest, TokenResponse, PaginatedResponse,
 )
 from auth import (
     hash_password, verify_password, create_access_token,
-    get_current_user, admin_or_hr, admin_hr_manager, all_roles,
+    get_current_user, hr_only, hr_manager, all_roles,
 )
 
 router = APIRouter()
@@ -106,7 +108,7 @@ async def list_users(
     limit: int = Query(20, ge=1, le=100),
     department: Optional[str] = None,
     role: Optional[str] = None,
-    _: dict = Depends(admin_hr_manager),
+    _: dict = Depends(hr_manager),
 ):
     collection = users_collection()
     query: dict = {}
@@ -122,7 +124,7 @@ async def list_users(
 
 
 @router.post("/users", status_code=201, tags=["Users"])
-async def create_user(body: UserCreate, _: dict = Depends(admin_or_hr)):
+async def create_user(body: UserCreate, _: dict = Depends(hr_only)):
     collection = users_collection()
     existing = await collection.find_one({"email": body.email})
     if existing:
@@ -136,7 +138,7 @@ async def create_user(body: UserCreate, _: dict = Depends(admin_or_hr)):
 
 @router.get("/users/{user_id}", tags=["Users"])
 async def get_user(user_id: str, current_user: dict = Depends(all_roles)):
-    if current_user["_id"] != user_id and current_user["role"] not in ("Admin", "HR", "Manager"):
+    if current_user["_id"] != user_id and current_user["role"] not in ("HR", "Manager"):
         raise HTTPException(status_code=403, detail="Forbidden")
     collection = users_collection()
     doc = await _get_or_404(collection, user_id)
@@ -145,7 +147,7 @@ async def get_user(user_id: str, current_user: dict = Depends(all_roles)):
 
 
 @router.patch("/users/{user_id}", tags=["Users"])
-async def update_user(user_id: str, body: UserUpdate, _: dict = Depends(admin_or_hr)):
+async def update_user(user_id: str, body: UserUpdate, _: dict = Depends(hr_only)):
     collection = users_collection()
     await _get_or_404(collection, user_id)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -157,7 +159,7 @@ async def update_user(user_id: str, body: UserUpdate, _: dict = Depends(admin_or
 
 
 @router.delete("/users/{user_id}", status_code=204, tags=["Users"])
-async def delete_user(user_id: str, _: dict = Depends(admin_or_hr)):
+async def delete_user(user_id: str, _: dict = Depends(hr_only)):
     collection = users_collection()
     await _get_or_404(collection, user_id)
     await collection.delete_one({"_id": ObjectId(user_id)})
@@ -196,7 +198,7 @@ async def list_reviews(
 
 
 @router.post("/reviews", status_code=201, tags=["Reviews"])
-async def create_review(body: ReviewCreate, current_user: dict = Depends(admin_hr_manager)):
+async def create_review(body: ReviewCreate, current_user: dict = Depends(hr_manager)):
     from datetime import datetime
     collection = reviews_collection()
     doc = body.model_dump()
@@ -218,7 +220,7 @@ async def get_review(review_id: str, current_user: dict = Depends(all_roles)):
 
 
 @router.patch("/reviews/{review_id}", tags=["Reviews"])
-async def update_review(review_id: str, body: ReviewUpdate, _: dict = Depends(admin_hr_manager)):
+async def update_review(review_id: str, body: ReviewUpdate, _: dict = Depends(hr_manager)):
     collection = reviews_collection()
     await _get_or_404(collection, review_id)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -232,7 +234,7 @@ async def update_review(review_id: str, body: ReviewUpdate, _: dict = Depends(ad
 
 
 @router.delete("/reviews/{review_id}", status_code=204, tags=["Reviews"])
-async def delete_review(review_id: str, _: dict = Depends(admin_hr_manager)):
+async def delete_review(review_id: str, _: dict = Depends(hr_manager)):
     collection = reviews_collection()
     await _get_or_404(collection, review_id)
     await collection.delete_one({"_id": ObjectId(review_id)})
@@ -265,7 +267,7 @@ async def list_competencies(
 
 
 @router.post("/competencies", status_code=201, tags=["Competencies"])
-async def create_competency(body: CompetencyCreate, _: dict = Depends(admin_or_hr)):
+async def create_competency(body: CompetencyCreate, _: dict = Depends(hr_only)):
     collection = competencies_collection()
     result = await collection.insert_one(body.model_dump())
     created = await collection.find_one({"_id": result.inserted_id})
@@ -278,7 +280,7 @@ async def get_competency(competency_id: str, _: dict = Depends(all_roles)):
 
 
 @router.patch("/competencies/{competency_id}", tags=["Competencies"])
-async def update_competency(competency_id: str, body: CompetencyUpdate, _: dict = Depends(admin_or_hr)):
+async def update_competency(competency_id: str, body: CompetencyUpdate, _: dict = Depends(hr_only)):
     collection = competencies_collection()
     await _get_or_404(collection, competency_id)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -288,7 +290,7 @@ async def update_competency(competency_id: str, body: CompetencyUpdate, _: dict 
 
 
 @router.delete("/competencies/{competency_id}", status_code=204, tags=["Competencies"])
-async def delete_competency(competency_id: str, _: dict = Depends(admin_or_hr)):
+async def delete_competency(competency_id: str, _: dict = Depends(hr_only)):
     collection = competencies_collection()
     await _get_or_404(collection, competency_id)
     await collection.delete_one({"_id": ObjectId(competency_id)})
@@ -324,7 +326,7 @@ async def list_development_plans(
 
 
 @router.post("/development-plans", status_code=201, tags=["Development Plans"])
-async def create_development_plan(body: DevelopmentPlanCreate, _: dict = Depends(admin_hr_manager)):
+async def create_development_plan(body: DevelopmentPlanCreate, _: dict = Depends(hr_manager)):
     from datetime import datetime
     collection = development_plans_collection()
     doc = body.model_dump()
@@ -344,7 +346,7 @@ async def get_development_plan(plan_id: str, current_user: dict = Depends(all_ro
 
 
 @router.patch("/development-plans/{plan_id}", tags=["Development Plans"])
-async def update_development_plan(plan_id: str, body: DevelopmentPlanUpdate, _: dict = Depends(admin_hr_manager)):
+async def update_development_plan(plan_id: str, body: DevelopmentPlanUpdate, _: dict = Depends(hr_manager)):
     collection = development_plans_collection()
     await _get_or_404(collection, plan_id)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -354,7 +356,109 @@ async def update_development_plan(plan_id: str, body: DevelopmentPlanUpdate, _: 
 
 
 @router.delete("/development-plans/{plan_id}", status_code=204, tags=["Development Plans"])
-async def delete_development_plan(plan_id: str, _: dict = Depends(admin_hr_manager)):
+async def delete_development_plan(plan_id: str, _: dict = Depends(hr_manager)):
     collection = development_plans_collection()
     await _get_or_404(collection, plan_id)
     await collection.delete_one({"_id": ObjectId(plan_id)})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EMPLOYEE GOALS
+# ══════════════════════════════════════════════════════════════════════════════
+@router.get("/goals", tags=["Goals"])
+async def list_goals(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    employee_id: Optional[str] = None,
+    current_user: dict = Depends(all_roles),
+):
+    """List goals for the authenticated user by default.
+
+    Managers and HR can request a specific employee's goals for review
+    workflows, but employees are always limited to their own goals.
+    """
+    collection = goals_collection()
+    query: dict = {}
+
+    if employee_id:
+        if current_user["role"] == "Employee":
+            query["employee_id"] = current_user["_id"]
+        elif current_user["role"] == "Manager":
+            if employee_id == current_user["_id"]:
+                query["employee_id"] = employee_id
+            else:
+                target_user = await users_collection().find_one({"_id": ObjectId(employee_id)})
+                if not target_user or target_user.get("manager_id") != current_user["_id"]:
+                    raise HTTPException(status_code=403, detail="Forbidden")
+                query["employee_id"] = employee_id
+        else:
+            query["employee_id"] = employee_id
+    else:
+        query["employee_id"] = current_user["_id"]
+
+    total = await collection.count_documents(query)
+    cursor = collection.find(query).skip(skip).limit(limit).sort("created_at", -1)
+    items = [_serialize(doc) async for doc in cursor]
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
+
+
+@router.post("/goals", status_code=201, tags=["Goals"])
+async def create_goal(body: EmployeeGoalCreate, current_user: dict = Depends(all_roles)):
+    """Create a goal for the authenticated user only."""
+    from datetime import datetime
+
+    if body.employee_id != current_user["_id"]:
+        raise HTTPException(status_code=403, detail="You can only create goals for your own profile")
+    
+    collection = goals_collection()
+    doc = body.model_dump()
+    doc["created_at"] = datetime.utcnow()
+    result = await collection.insert_one(doc)
+    created = await collection.find_one({"_id": result.inserted_id})
+    print(f"[GOALS] Created goal for {body.employee_name}: {body.title}")
+    return _serialize(created)  # type: ignore
+
+
+@router.get("/goals/{goal_id}", tags=["Goals"])
+async def get_goal(goal_id: str, current_user: dict = Depends(all_roles)):
+    collection = goals_collection()
+    doc = await _get_or_404(collection, goal_id)
+    if current_user["role"] == "Employee" and doc["employee_id"] != current_user["_id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return doc
+
+
+@router.patch("/goals/{goal_id}", tags=["Goals"])
+async def update_goal(goal_id: str, body: EmployeeGoalUpdate, current_user: dict = Depends(all_roles)):
+    """Update a goal only if it belongs to the authenticated user.
+
+    Manager ratings are still written through this endpoint, but the goal owner
+    must match the authenticated user for direct edits.
+    """
+    collection = goals_collection()
+    doc = await _get_or_404(collection, goal_id)
+    
+    if doc["employee_id"] != current_user["_id"]:
+        raise HTTPException(status_code=403, detail="You can only update your own goals")
+    
+    from datetime import datetime
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "manager_rating" in updates and updates["manager_rating"] is not None:
+        updates["manager_id"] = current_user["_id"]
+        updates["rated_at"] = datetime.utcnow().isoformat()
+    
+    await collection.find_one_and_update({"_id": ObjectId(goal_id)}, {"$set": updates})
+    updated = await collection.find_one({"_id": ObjectId(goal_id)})
+    return _serialize(updated)  # type: ignore
+
+
+@router.delete("/goals/{goal_id}", status_code=204, tags=["Goals"])
+async def delete_goal(goal_id: str, current_user: dict = Depends(all_roles)):
+    """Delete a goal only if it belongs to the authenticated user."""
+    collection = goals_collection()
+    doc = await _get_or_404(collection, goal_id)
+    
+    if doc["employee_id"] != current_user["_id"]:
+        raise HTTPException(status_code=403, detail="You can only delete your own goals")
+    
+    await collection.delete_one({"_id": ObjectId(goal_id)})

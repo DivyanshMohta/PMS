@@ -50,8 +50,8 @@ export default function AssignManagerPage() {
       const mgrs = allUsers.filter((u: User) => u.role === 'Manager');
       setManagers(mgrs);
 
-      // Filter non-admin/non-HR users (employees and managers)
-      const emps = allUsers.filter((u: User) => u.role !== 'Admin' && u.role !== 'HR');
+      // Filter non-HR users (employees and managers)
+      const emps = allUsers.filter((u: User) => u.role !== 'HR');
       setEmployees(emps);
 
       setError(null);

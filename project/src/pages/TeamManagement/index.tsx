@@ -79,8 +79,8 @@ export default function TeamManagementPage() {
     employeeId: string;
     period: string;
     notes: string;
-    projects: { id: string; name: string; score: number }[];
-  }>({ employeeId: "", period: "H1 2025", notes: "", projects: [] });
+    goals: { id: string; title: string; score: number }[];
+  }>({ employeeId: "", period: "Mid-Year", notes: "", goals: [] });
 
   // Local reviews state — starts from mock data, updated when new reviews are created
   const [localReviews, setLocalReviews] = useState<Review[]>(() => {
@@ -91,10 +91,11 @@ export default function TeamManagementPage() {
     return [...MOCK_REVIEWS];
   });
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
+  const [employeeGoals, setEmployeeGoals] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const periods = ["H1 2025", "H2 2025", "H1 2024", "H2 2024"];
+  const periods = ["Mid-Year", "Annual"];
 
   useEffect(() => {
     // Fetch real reviews from the backend and merge with mock data
@@ -146,7 +147,7 @@ export default function TeamManagementPage() {
         // Manager sees only their direct reports
         filteredUsers = allUsers.filter((u: any) => u.manager_id === user._id);
       } else {
-        // HR/Admin sees all employees (non-HR, non-Admin)
+        // HR sees all employees, managers see direct reports
         filteredUsers = allUsers.filter((u: any) => u.role === 'Employee' || u.role === 'Manager');
       }
 
@@ -182,6 +183,21 @@ export default function TeamManagementPage() {
     }
   }
 
+  async function fetchEmployeeGoals(employeeId: string) {
+    try {
+      const res = await apiClient.get(`/goals?employee_id=${employeeId}&limit=100`);
+      const goals = res.data?.items || [];
+      setEmployeeGoals((prev) => ({
+        ...prev,
+        [employeeId]: goals,
+      }));
+      return goals;
+    } catch (err: any) {
+      console.error("Failed to fetch employee goals:", err);
+      return [];
+    }
+  }
+
   const handleCreateReview = async () => {
     if (!newReview.employeeId) {
       setSnackbar({ open: true, message: "Please select an employee.", severity: "error" });
@@ -189,18 +205,25 @@ export default function TeamManagementPage() {
     }
     setSubmitting(true);
 
-    const employee = MOCK_USERS.find((u) => u.id === newReview.employeeId);
+    // Get the selected employee from the employees array (to get originalId)
+    const selectedEmp = employees.find((e) => e.id === newReview.employeeId);
+    if (!selectedEmp) {
+      setSnackbar({ open: true, message: "Employee not found.", severity: "error" });
+      setSubmitting(false);
+      return;
+    }
+
     const reviewer = user;
 
-    const avgScore = newReview.projects.length > 0
-      ? newReview.projects.reduce((acc, curr) => acc + curr.score, 0) / newReview.projects.length
+    const avgScore = newReview.goals.length > 0
+      ? newReview.goals.reduce((acc, curr) => acc + curr.score, 0) / newReview.goals.length
       : 0;
     const finalScore = Number(avgScore.toFixed(1));
 
-    const mappedGoals = newReview.projects.map(p => ({
-      id: p.id,
-      title: p.name,
-      description: `Score: ${p.score} stars`,
+    const mappedGoals = newReview.goals.map(g => ({
+      id: g.id,
+      title: g.title,
+      description: `Manager Rating: ${g.score} stars`,
       progress: 100,
       dueDate: new Date().toISOString().split('T')[0],
       status: "Completed" as const,
@@ -210,8 +233,8 @@ export default function TeamManagementPage() {
     // Build a local review object to add to state immediately
     const localEntry: Review = {
       id: `r_local_${Date.now()}`,
-      employeeId: newReview.employeeId,
-      employeeName: employee?.name ?? "",
+      employeeId: selectedEmp.originalId,
+      employeeName: selectedEmp.name,
       reviewerId: reviewer?.id ?? "unknown",
       reviewerName: reviewer?.name ?? "Unknown",
       period: newReview.period,
@@ -221,20 +244,30 @@ export default function TeamManagementPage() {
       competencyScores: [],
     };
 
-    // 1. Save to backend first, then update UI
+    // 1. Save goal ratings to backend (PATCH each goal)
     try {
+      for (const goal of newReview.goals) {
+        if (goal.score > 0) {
+          await apiClient.patch(`/goals/${goal.id}`, {
+            manager_rating: goal.score,
+            manager_feedback: newReview.notes,
+          });
+        }
+      }
+
+      // 2. Save review to backend
       await apiClient.post("/reviews", {
-        employee_id: newReview.employeeId,
-        employee_name: employee?.name ?? "",
+        employee_id: selectedEmp.originalId,
+        employee_name: selectedEmp.name,
         reviewer_id: reviewer?.id ?? "",
         reviewer_name: reviewer?.name ?? "",
         period: newReview.period,
         status: "Completed",
         overall_score: finalScore,
-        goals: newReview.projects.map(p => ({
-          id: p.id,
-          title: p.name,
-          description: `Score: ${p.score} stars`,
+        goals: newReview.goals.map(g => ({
+          id: g.id,
+          title: g.title,
+          description: `Manager Rating: ${g.score} stars`,
           progress: 100,
           due_date: new Date().toISOString().split('T')[0],
           status: "Completed",
@@ -244,15 +277,19 @@ export default function TeamManagementPage() {
         notes: newReview.notes,
       });
 
-      // 2. Update local state for immediate UI feedback only if backend succeeds
+      // 3. Update local state for immediate UI feedback only if backend succeeds
       setLocalReviews((prev) => {
         const next = [localEntry, ...prev];
         localStorage.setItem('hrms_reviews_fallback', JSON.stringify(next));
         return next;
       });
+      
+      // 3. Refresh employees list to show updated review status
+      await fetchEmployees();
+      
       setCreateReviewOpen(false);
-      setNewReview({ employeeId: "", period: "H1 2025", notes: "", projects: [] });
-      setSnackbar({ open: true, message: `Review saved to hrms_db for ${employee?.name}`, severity: "success" });
+      setNewReview({ employeeId: "", period: "Mid-Year", notes: "", goals: [] });
+      setSnackbar({ open: true, message: `Review saved to hrms_db for ${selectedEmp.name}`, severity: "success" });
       setSubmitting(false);
 
     } catch (err: any) {
@@ -267,8 +304,11 @@ export default function TeamManagementPage() {
         return next;
       });
       
+      // Refresh employees list even on fallback
+      await fetchEmployees();
+      
       setCreateReviewOpen(false);
-      setNewReview({ employeeId: "", period: "H1 2025", notes: "", projects: [] });
+      setNewReview({ employeeId: "", period: "Mid-Year", notes: "", goals: [] });
       setSnackbar({ 
         open: true, 
         message: `Saved Locally (Database Error: ${msg})`, 
@@ -827,12 +867,13 @@ export default function TeamManagementPage() {
               <Button
                 variant="contained"
                 startIcon={<EditIcon />}
-                onClick={() => {
-                  const empId = selectedEmployee.originalId;
-                  const pastReview = localReviews.find(r => r.employeeId === empId);
-                  const initialProjects = pastReview?.goals.map(g => ({
-                    id: g.id,
-                    name: g.title,
+                onClick={async () => {
+                  const empId = selectedEmployee.id; // Use formatted ID (with period) that dropdown expects
+                  const originalId = selectedEmployee.originalId;
+                  const goals = employeeGoals[originalId] || await fetchEmployeeGoals(originalId);
+                  const initialGoals = goals.map((g: any) => ({
+                    id: g._id,
+                    title: g.title,
                     score: 0
                   })) || [];
                   
@@ -840,7 +881,7 @@ export default function TeamManagementPage() {
                     employeeId: empId,
                     period: selectedEmployee.reviewPeriod,
                     notes: "",
-                    projects: initialProjects
+                    goals: initialGoals
                   });
                   setSelectedEmployee(null);
                   setCreateReviewOpen(true);
@@ -871,15 +912,18 @@ export default function TeamManagementPage() {
               <Select
                 value={newReview.employeeId}
                 label="Employee"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const empId = e.target.value;
-                  const pastReview = localReviews.find(r => r.employeeId === empId);
-                  const initialProjects = pastReview?.goals.map(g => ({
-                    id: g.id,
-                    name: g.title,
-                    score: 0
-                  })) || [];
-                  setNewReview((p) => ({ ...p, employeeId: empId, projects: initialProjects }));
+                  const selectedEmp = employees.find(u => u.id === empId);
+                  if (selectedEmp) {
+                    const goals = employeeGoals[selectedEmp.originalId] || await fetchEmployeeGoals(selectedEmp.originalId);
+                    const initialGoals = goals.map((g: any) => ({
+                      id: g._id,
+                      title: g.title,
+                      score: 0
+                    })) || [];
+                    setNewReview((p) => ({ ...p, employeeId: empId, goals: initialGoals }));
+                  }
                 }}
               >
                 {employees.map((u) => (
@@ -918,51 +962,25 @@ export default function TeamManagementPage() {
 
             <Box sx={{ mt: 1 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Projects & Ratings</Typography>
-                <Button 
-                  size="small" 
-                  startIcon={<AddIcon />} 
-                  onClick={() => {
-                    setNewReview(p => ({
-                      ...p, 
-                      projects: [...p.projects, { id: Date.now().toString(), name: "", score: 0 }]
-                    }));
-                  }}
-                >
-                  Add Project
-                </Button>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Employee Goals & Ratings</Typography>
               </Box>
               
-              {newReview.projects.map((proj, idx) => (
-                <Box key={proj.id} sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 1.5 }}>
-                  <TextField 
-                    size="small" 
-                    placeholder="Project Name"
-                    value={proj.name}
-                    onChange={(e) => {
-                      const updated = [...newReview.projects];
-                      updated[idx].name = e.target.value;
-                      setNewReview(p => ({ ...p, projects: updated }));
-                    }}
-                    sx={{ flex: 1 }}
-                  />
+              {newReview.goals.map((goal, idx) => (
+                <Box key={goal.id} sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 1.5 }}>
+                  <Typography variant="body2" sx={{ flex: 1, fontWeight: 500 }}>
+                    {goal.title}
+                  </Typography>
                   <Rating 
-                    value={proj.score}
+                    value={goal.score}
                     onChange={(_, val) => {
-                      const updated = [...newReview.projects];
+                      const updated = [...newReview.goals];
                       updated[idx].score = val || 0;
-                      setNewReview(p => ({ ...p, projects: updated }));
+                      setNewReview(p => ({ ...p, goals: updated }));
                     }}
                   />
-                  <IconButton size="small" color="error" onClick={() => {
-                    const updated = newReview.projects.filter(p => p.id !== proj.id);
-                    setNewReview(p => ({ ...p, projects: updated }));
-                  }}>
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
                 </Box>
               ))}
-              {newReview.projects.length === 0 && (
+              {newReview.goals.length === 0 && (
                 <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
                   No projects added yet. Click "Add Project" to include them in the review.
                 </Typography>

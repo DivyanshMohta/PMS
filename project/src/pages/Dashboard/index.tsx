@@ -127,7 +127,7 @@ function StatCard({
 
 export default function DashboardPage() {
   const { user, hasRole } = useAuth();
-  const [selectedPeriod, setSelectedPeriod] = useState("H2 2024");
+  const [selectedPeriod, setSelectedPeriod] = useState("Annual");
 
   const myReview =
     MOCK_REVIEWS.find(
@@ -169,7 +169,7 @@ export default function DashboardPage() {
     },
     {
       user: "HR Team",
-      action: "launched H2 2024 review cycle",
+      action: "launched Annual review cycle",
       time: "1d ago",
       color: "#0ea5e9",
     },
@@ -215,16 +215,15 @@ export default function DashboardPage() {
             label="Review Period"
             onChange={(e) => setSelectedPeriod(e.target.value)}
           >
-            <MenuItem value="H2 2024">H2 2024</MenuItem>
-            <MenuItem value="H1 2024">H1 2024</MenuItem>
-            <MenuItem value="H2 2023">H2 2023</MenuItem>
+            <MenuItem value="Annual">Annual</MenuItem>
+            <MenuItem value="Mid-Year">Mid-Year</MenuItem>
           </Select>
         </FormControl>
       </Box>
 
       {/* Stats Row */}
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
-        {hasRole("Admin", "HR", "Manager") && (
+        {hasRole("HR", "Manager") && (
           <Grid item xs={12} sm={6} lg={3}>
             <StatCard
               title="Active Employees"
@@ -240,7 +239,7 @@ export default function DashboardPage() {
           item
           xs={12}
           sm={6}
-          lg={hasRole("Admin", "HR", "Manager") ? 3 : 4}
+          lg={hasRole("HR", "Manager") ? 3 : 4}
         >
           <StatCard
             title="Reviews Completed"
@@ -255,7 +254,7 @@ export default function DashboardPage() {
           item
           xs={12}
           sm={6}
-          lg={hasRole("Admin", "HR", "Manager") ? 3 : 4}
+          lg={hasRole("HR", "Manager") ? 3 : 4}
         >
           <StatCard
             title="In Progress"
@@ -269,7 +268,7 @@ export default function DashboardPage() {
           item
           xs={12}
           sm={6}
-          lg={hasRole("Admin", "HR", "Manager") ? 3 : 4}
+          lg={hasRole("HR", "Manager") ? 3 : 4}
         >
           <StatCard
             title="Avg. Score"

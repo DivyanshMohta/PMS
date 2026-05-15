@@ -26,7 +26,6 @@ import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../api/client";
 
 const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
-  Admin:    { bg: "#ef444420", color: "#ef4444" },
   HR:       { bg: "#f59e0b20", color: "#f59e0b" },
   Manager:  { bg: "#10b98120", color: "#10b981" },
   Employee: { bg: "#0ea5e920", color: "#0ea5e9" },

@@ -16,7 +16,6 @@ PyObjectId = Annotated[str, BeforeValidator(_coerce_objectid)]
 
 # ── Enumerations ───────────────────────────────────────────────────────────────
 class UserRole(str, Enum):
-    Admin = "Admin"
     HR = "HR"
     Manager = "Manager"
     Employee = "Employee"
@@ -64,6 +63,7 @@ class Goal(BaseModel):
     due_date: str
     status: GoalStatus = GoalStatus.NotStarted
     weight: int = Field(ge=0, le=100, default=0)
+    manager_rating: Optional[float] = None
 
 
 class CompetencyScore(BaseModel):
@@ -126,6 +126,45 @@ class UserResponse(UserBase):
     model_config = {"populate_by_name": True}
 
 
+# ── Employee Goal ──────────────────────────────────────────────────────────────
+class EmployeeGoalBase(BaseModel):
+    employee_id: str
+    employee_name: str
+    title: str
+    description: str
+    due_date: str
+    status: GoalStatus = GoalStatus.NotStarted
+    progress: int = Field(ge=0, le=100, default=0)
+    weight: int = Field(ge=0, le=100, default=0)
+
+
+class EmployeeGoalCreate(EmployeeGoalBase):
+    pass
+
+
+class EmployeeGoalUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    status: Optional[GoalStatus] = None
+    progress: Optional[int] = None
+    weight: Optional[int] = None
+    manager_rating: Optional[float] = None
+    manager_feedback: Optional[str] = None
+    manager_id: Optional[str] = None
+
+
+class EmployeeGoalResponse(EmployeeGoalBase):
+    id: PyObjectId = Field(alias="_id")
+    manager_rating: Optional[float] = None
+    manager_feedback: Optional[str] = None
+    manager_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    rated_at: Optional[str] = None
+
+    model_config = {"populate_by_name": True}
+
+
 # ── Review ─────────────────────────────────────────────────────────────────────
 class ReviewBase(BaseModel):
     employee_id: str
@@ -149,6 +188,7 @@ class ReviewUpdate(BaseModel):
     overall_score: Optional[float] = None
     goals: Optional[List[Goal]] = None
     competency_scores: Optional[List[CompetencyScore]] = None
+    notes: Optional[str] = None
     submitted_at: Optional[str] = None
 
 

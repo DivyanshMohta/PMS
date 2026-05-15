@@ -39,12 +39,14 @@ function getInitials(name: string): string {
 function normalizeUser(raw: Record<string, unknown>): AuthUser {
   const id = (raw._id ?? raw.id ?? '') as string;
   const name = (raw.name ?? '') as string;
+  const rawRole = (raw.role ?? 'Employee') as string;
+  const role: UserRole = rawRole === 'Manager' || rawRole === 'Employee' ? rawRole : 'HR';
   return {
     _id: id,
     id,
     name,
     email: (raw.email ?? '') as string,
-    role: (raw.role ?? 'Employee') as UserRole,
+    role,
     department: (raw.department ?? '') as string,
     title: (raw.title ?? '') as string,
     avatar: (raw.avatar as string | undefined) ?? getInitials(name),

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Grid,
@@ -26,12 +27,21 @@ import {
   List,
   ListItem,
   ListItemText,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import EditIcon from "@mui/icons-material/Edit";
 import { LineChart } from "@mui/x-charts";
+import apiClient from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 import {
   MOCK_REVIEWS,
@@ -47,15 +57,34 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 export default function MyPerformancePage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [tab, setTab] = useState(0);
-  const [addGoalOpen, setAddGoalOpen] = useState(false);
-  const [newGoal, setNewGoal] = useState({
-    title: "",
-    description: "",
-    dueDate: "",
-    weight: "",
-  });
+  const [employeeGoals, setEmployeeGoals] = useState<any[]>([]);
+  const [goalsLoading, setGoalsLoading] = useState(false);
+  const [goalsError, setGoalsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tab === 2) {
+      fetchEmployeeGoals();
+    }
+  }, [tab, user]);
+
+  const fetchEmployeeGoals = async () => {
+    setGoalsLoading(true);
+    setGoalsError(null);
+    try {
+      const res = await apiClient.get("/goals?limit=100");
+      setEmployeeGoals(res.data?.items || []);
+    } catch (err: any) {
+      const msg = typeof err?.response?.data?.detail === "string"
+        ? err.response.data.detail
+        : err?.message || "Failed to load goals";
+      setGoalsError(msg);
+    } finally {
+      setGoalsLoading(false);
+    }
+  };
 
   const myReviews = MOCK_REVIEWS.filter(
     (r) => r.employeeId === (user?.id || "u4"),
@@ -467,118 +496,131 @@ export default function MyPerformancePage() {
         </Grid>
       )}
 
+      {/* Goals Tab — loading */}
+      {tab === 2 && goalsLoading && (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {/* Goals Tab — error */}
+      {tab === 2 && goalsError && !goalsLoading && (
+        <Alert severity="error">{goalsError}</Alert>
+      )}
+
       {/* Goals Tab — empty state */}
-      {tab === 2 && !latestReview && (
+      {tab === 2 && !goalsLoading && employeeGoals.length === 0 && (
         <Paper sx={{ p: 5, textAlign: "center" }}>
           <Typography variant="h6" sx={{ color: "#94a3b8", fontWeight: 500 }}>
-            No goals found.
+            No goals yet.
           </Typography>
           <Typography variant="body2" sx={{ color: "#cbd5e1", mt: 1 }}>
-            Goals are created as part of your performance review.
+            Add your first goal to track your professional development.
           </Typography>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate("/goals")}
+            sx={{ mt: 2, borderRadius: 2 }}
+          >
+            Add Your First Goal
+          </Button>
         </Paper>
       )}
 
       {/* Goals Tab */}
-      {tab === 2 && latestReview && (
+      {tab === 2 && !goalsLoading && employeeGoals.length > 0 && (
         <Box>
           <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setAddGoalOpen(true)}
+              onClick={() => navigate("/goals")}
               sx={{ borderRadius: 2 }}
             >
               Add Goal
             </Button>
           </Box>
-          <Grid container spacing={2}>
-            {latestReview.goals.map((g) => (
-              <Grid item xs={12} md={6} key={g.id}>
-                <Card sx={{ height: "100%" }}>
-                  <CardContent sx={{ p: 2.5 }}>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        mb: 1,
-                      }}
-                    >
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 600, color: "#0f172a" }}
-                      >
-                        {g.title}
-                      </Typography>
+
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead sx={{ bgcolor: "#f8fafc" }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600, color: "#0f172a" }}>Goal</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: "#0f172a" }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: "#0f172a" }}>Progress</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: "#0f172a" }}>Due Date</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: "#0f172a" }}>Weight</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: "#0f172a" }}>Manager Rating</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {employeeGoals.map((goal) => (
+                  <TableRow key={goal._id} sx={{ "&:hover": { bgcolor: "#f8fafc" } }}>
+                    <TableCell>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: "#0f172a" }}>
+                          {goal.title}
+                        </Typography>
+                        {goal.description && (
+                          <Typography variant="caption" sx={{ color: "#64748b", display: "block", mt: 0.5 }}>
+                            {goal.description}
+                          </Typography>
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
                       <Chip
-                        label={g.status}
+                        label={goal.status}
                         size="small"
                         sx={{
-                          height: 20,
-                          fontSize: 10,
+                          bgcolor: goal.status === "Completed" ? "#10b98120" : "#0ea5e920",
+                          color: goal.status === "Completed" ? "#10b981" : "#0ea5e9",
                           fontWeight: 600,
-                          bgcolor:
-                            g.status === "Completed"
-                              ? "#10b98120"
-                              : "#0ea5e920",
-                          color:
-                            g.status === "Completed" ? "#10b981" : "#0ea5e9",
                         }}
                       />
-                    </Box>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: "#64748b", mb: 1.5, fontSize: 13 }}
-                    >
-                      {g.description}
-                    </Typography>
-                    <Box sx={{ display: "flex", gap: 1, mb: 1.5 }}>
-                      <Chip
-                        label={`Due: ${g.dueDate}`}
-                        size="small"
-                        sx={{
-                          bgcolor: "#f1f5f9",
-                          color: "#64748b",
-                          fontSize: 11,
-                        }}
-                      />
-                      <Chip
-                        label={`Weight: ${g.weight}%`}
-                        size="small"
-                        sx={{
-                          bgcolor: "#f1f5f9",
-                          color: "#64748b",
-                          fontSize: 11,
-                        }}
-                      />
-                    </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <LinearProgress
-                        variant="determinate"
-                        value={g.progress}
-                        sx={{
-                          flex: 1,
-                          height: 8,
-                          borderRadius: 4,
-                          bgcolor: "#f1f5f9",
-                          "& .MuiLinearProgress-bar": {
-                            bgcolor: "#1a3a5c",
-                            borderRadius: 4,
-                          },
-                        }}
-                      />
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 700, color: "#1a3a5c" }}
-                      >
-                        {g.progress}%
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <LinearProgress
+                          variant="determinate"
+                          value={goal.progress || 0}
+                          sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: "#f1f5f9" }}
+                        />
+                        <Typography variant="caption" sx={{ fontWeight: 600, minWidth: 30 }}>
+                          {goal.progress || 0}%
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {new Date(goal.due_date).toLocaleDateString()}
                       </Typography>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={`${goal.weight}%`} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell>
+                      {goal.manager_rating ? (
+                        <Box>
+                          <Rating value={goal.manager_rating} readOnly size="small" />
+                          {goal.manager_feedback && (
+                            <Typography variant="caption" sx={{ color: "#64748b", display: "block", mt: 0.5 }}>
+                              {goal.manager_feedback}
+                            </Typography>
+                          )}
+                        </Box>
+                      ) : (
+                        <Typography variant="caption" sx={{ color: "#94a3b8" }}>
+                          Pending
+                        </Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Box>
       )}
 
@@ -652,69 +694,6 @@ export default function MyPerformancePage() {
           ))}
         </Box>
       )}
-
-      {/* Add Goal Dialog */}
-      <Dialog
-        open={addGoalOpen}
-        onClose={() => setAddGoalOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700 }}>Add New Goal</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
-            <TextField
-              label="Goal Title"
-              fullWidth
-              value={newGoal.title}
-              onChange={(e) =>
-                setNewGoal((p) => ({ ...p, title: e.target.value }))
-              }
-            />
-            <TextField
-              label="Description"
-              fullWidth
-              multiline
-              rows={3}
-              value={newGoal.description}
-              onChange={(e) =>
-                setNewGoal((p) => ({ ...p, description: e.target.value }))
-              }
-            />
-            <TextField
-              label="Due Date"
-              type="date"
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-              value={newGoal.dueDate}
-              onChange={(e) =>
-                setNewGoal((p) => ({ ...p, dueDate: e.target.value }))
-              }
-            />
-            <TextField
-              label="Weight (%)"
-              type="number"
-              fullWidth
-              value={newGoal.weight}
-              onChange={(e) =>
-                setNewGoal((p) => ({ ...p, weight: e.target.value }))
-              }
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button
-            onClick={() => setAddGoalOpen(false)}
-            sx={{ color: "#64748b" }}
-          >
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={() => setAddGoalOpen(false)}>
-            Add Goal
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }

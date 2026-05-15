@@ -188,9 +188,12 @@ function PlanCard({
           <Box>
             <Typography
               variant="h6"
-              sx={{ fontWeight: 700, color: "#0f172a", fontSize: 16 }}
+              sx={{ fontWeight: 700, color: "#0f172a", fontSize: 16, mb: 0.5 }}
             >
               {plan.title}
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: "#1a3a5c", mb: 0.5 }}>
+              {plan.employeeName}
             </Typography>
             <Typography variant="caption" sx={{ color: "#64748b" }}>
               Target: {plan.targetRole}
@@ -302,6 +305,8 @@ export default function DevelopmentPlansPage() {
   const [selectedPlan, setSelectedPlan] = useState<DevelopmentPlan | null>(
     null,
   );
+  const [plansState, setPlansState] = useState<DevelopmentPlan[]>(MOCK_DEVELOPMENT_PLANS);
+  const [editingPlan, setEditingPlan] = useState<DevelopmentPlan | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [newPlan, setNewPlan] = useState({
     employeeId: "",
@@ -309,10 +314,9 @@ export default function DevelopmentPlansPage() {
     targetRole: "",
     endDate: "",
   });
-
-  const plans = hasRole("Admin", "HR", "Manager")
-    ? MOCK_DEVELOPMENT_PLANS
-    : MOCK_DEVELOPMENT_PLANS.filter((p) => p.employeeId === (user?.id || "u4"));
+  const plans = hasRole("HR", "Manager")
+    ? plansState
+    : plansState.filter((p) => p.employeeId === (user?.id || "u4"));
 
   return (
     <Box>
@@ -334,7 +338,7 @@ export default function DevelopmentPlansPage() {
             Track growth paths, training records, certifications, and milestones
           </Typography>
         </Box>
-        {hasRole("Admin", "HR", "Manager") && (
+        {hasRole("HR", "Manager") && (
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -574,13 +578,24 @@ export default function DevelopmentPlansPage() {
               >
                 Close
               </Button>
-              <Button
+              {/* <Button
                 variant="contained"
                 startIcon={<EditIcon />}
-                onClick={() => setSelectedPlan(null)}
+                onClick={() => {
+                  // Open create/edit dialog prefilled with selected plan
+                  setEditingPlan(selectedPlan);
+                  setNewPlan({
+                    employeeId: selectedPlan.employeeId,
+                    title: selectedPlan.title,
+                    targetRole: selectedPlan.targetRole,
+                    endDate: selectedPlan.endDate,
+                  });
+                  setSelectedPlan(null);
+                  setCreateOpen(true);
+                }}
               >
                 Edit Plan
-              </Button>
+              </Button> */}
             </DialogActions>
           </>
         )}
@@ -643,16 +658,56 @@ export default function DevelopmentPlansPage() {
             />
           </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <DialogActions sx={{ px: 3, pb: 3 }}>
           <Button
-            onClick={() => setCreateOpen(false)}
+            onClick={() => {
+              setCreateOpen(false);
+              setEditingPlan(null);
+            }}
             sx={{ color: "#64748b" }}
           >
             Cancel
           </Button>
-          <Button variant="contained" onClick={() => setCreateOpen(false)}>
-            Create Plan
-          </Button>
+          {editingPlan ? (
+            <Button
+              variant="contained"
+              onClick={() => {
+                // Update plan in local state
+                setPlansState((prev) => prev.map((p) => (p.id === editingPlan.id ? { ...p, employeeId: newPlan.employeeId, title: newPlan.title, targetRole: newPlan.targetRole, endDate: newPlan.endDate } : p)));
+                setCreateOpen(false);
+                setEditingPlan(null);
+              }}
+            >
+              Update Plan
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              onClick={() => {
+                // Create new plan in local state (mocked)
+                const id = `plan_${Date.now()}`;
+                setPlansState((prev) => [
+                  ...prev,
+                  {
+                    id,
+                    employeeId: newPlan.employeeId,
+                    employeeName: MOCK_DEVELOPMENT_PLANS.find((p) => p.employeeId === newPlan.employeeId)?.employeeName || "Unknown",
+                    title: newPlan.title,
+                    targetRole: newPlan.targetRole,
+                    startDate: new Date().toISOString().split("T")[0],
+                    endDate: newPlan.endDate,
+                    status: "Active",
+                    overallProgress: 0,
+                    milestones: [],
+                    trainings: [],
+                  },
+                ]);
+                setCreateOpen(false);
+              }}
+            >
+              Create Plan
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

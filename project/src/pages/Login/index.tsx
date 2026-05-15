@@ -11,7 +11,6 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { useAuth } from '../../context/AuthContext';
 
 const DEMO_ACCOUNTS = [
-  { email: 'admin@hrms.com', password: 'admin123', role: 'Admin' },
   { email: 'hr@hrms.com', password: 'hr123', role: 'HR' },
   { email: 'manager@hrms.com', password: 'manager123', role: 'Manager' },
   { email: 'employee@hrms.com', password: 'employee123', role: 'Employee' },
@@ -46,7 +45,7 @@ export default function LoginPage() {
     setError('');
   };
 
-  const roleColors: Record<string, string> = { Admin: '#ef4444', HR: '#f59e0b', Manager: '#10b981', Employee: '#0ea5e9' };
+  const roleColors: Record<string, string> = { HR: '#f59e0b', Manager: '#10b981', Employee: '#0ea5e9' };
 
   return (
     <Box sx={{

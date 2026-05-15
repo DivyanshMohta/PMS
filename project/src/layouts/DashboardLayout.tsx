@@ -30,6 +30,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SupervisedUserCircleIcon from '@mui/icons-material/SupervisedUserCircle';
 import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import FlagIcon from "@mui/icons-material/Flag";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import SearchIcon from "@mui/icons-material/Search";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -45,19 +46,19 @@ const NAV_ITEMS = [
     label: "Dashboard",
     icon: <DashboardIcon />,
     path: "/",
-    roles: ["Admin", "HR", "Manager", "Employee"],
+    roles: ["HR", "Manager", "Employee"],
   },
   {
     label: "My Performance",
     icon: <AssessmentIcon />,
     path: "/my-performance",
-    roles: ["Admin", "HR", "Manager", "Employee"],
+    roles: ["HR", "Manager", "Employee"],
   },
   {
     label: "Team Management",
     icon: <GroupIcon />,
     path: "/team",
-    roles: ["Admin", "HR", "Manager"],
+    roles: ["HR", "Manager"],
   },
   {
     label: "New Employee",
@@ -75,13 +76,19 @@ const NAV_ITEMS = [
     label: "Development Plans",
     icon: <SchoolIcon />,
     path: "/development",
-    roles: ["Admin", "HR", "Manager", "Employee"],
+    roles: ["HR", "Manager", "Employee"],
+  },
+  {
+    label: "My Goals",
+    icon: <FlagIcon />,
+    path: "/goals",
+    roles: ["HR", "Manager", "Employee"],
   },
   {
     label: "Competency Dictionary",
     icon: <MenuBookIcon />,
     path: "/competencies",
-    roles: ["Admin"],
+    roles: ["HR"],
   },
 ];
 
@@ -100,7 +107,6 @@ export default function DashboardLayout() {
   );
 
   const roleColor: Record<string, string> = {
-    Admin: "#ef4444",
     HR: "#f59e0b",
     Manager: "#10b981",
     Employee: "#0ea5e9",

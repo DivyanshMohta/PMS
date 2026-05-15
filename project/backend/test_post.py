@@ -15,7 +15,7 @@ async def run():
             "employee_name": "James Okafor",
             "reviewer_id": "u3",
             "reviewer_name": "Sarah Williams",
-            "period": "H1 2025",
+            "period": "Mid-Year",
             "status": "Completed",
             "overall_score": 4.5,
             "goals": [],

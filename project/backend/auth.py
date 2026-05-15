@@ -51,7 +51,7 @@ async def get_current_user(
     if token.startswith("mock_jwt_"):
         parts = token.split("_")
         user_id = parts[2] if len(parts) > 2 else "u1"
-        return {"_id": user_id, "role": "Admin"} # Treat mock as Admin to allow all actions
+        return {"_id": user_id, "role": "HR"} # Treat mock tokens as HR for legacy fallback
 
     payload = decode_token(token)
     user_id: str = payload.get("sub")  # type: ignore
@@ -84,6 +84,6 @@ def require_roles(*roles: UserRole):
     return _check
 
 
-admin_or_hr = require_roles(UserRole.Admin, UserRole.HR)
-admin_hr_manager = require_roles(UserRole.Admin, UserRole.HR, UserRole.Manager)
-all_roles = require_roles(UserRole.Admin, UserRole.HR, UserRole.Manager, UserRole.Employee)
+hr_only = require_roles(UserRole.HR)
+hr_manager = require_roles(UserRole.HR, UserRole.Manager)
+all_roles = require_roles(UserRole.HR, UserRole.Manager, UserRole.Employee)

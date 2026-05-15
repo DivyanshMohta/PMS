@@ -3,7 +3,7 @@ import { Box, Paper, Typography, TextField, Button, MenuItem, Stack, Alert } fro
 import apiClient from '../../api/client';
 import { useNavigate } from 'react-router-dom';
 
-const roles = ['Employee', 'Manager', 'HR', 'Admin'];
+const roles = ['Employee', 'Manager', 'HR'];
 
 export default function NewEmployeePage() {
   const navigate = useNavigate();

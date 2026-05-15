@@ -58,3 +58,7 @@ def competencies_collection():
 
 def development_plans_collection():
     return db["development_plans"]
+
+
+def goals_collection():
+    return db["goals"]

@@ -1,4 +1,4 @@
-export type UserRole = 'Admin' | 'HR' | 'Manager' | 'Employee';
+export type UserRole = 'HR' | 'Manager' | 'Employee';
 
 export interface User {
   id: string;
@@ -96,7 +96,7 @@ export interface FeedbackLog {
 }
 
 export const MOCK_USERS: User[] = [
-  { id: 'u1', name: 'Alexandra Chen', email: 'admin@hrms.com', role: 'Admin', department: 'HR', title: 'HR Director', avatar: 'AC' },
+  { id: 'u1', name: 'Alexandra Chen', email: 'admin@hrms.com', role: 'HR', department: 'HR', title: 'HR Director', avatar: 'AC' },
   { id: 'u2', name: 'Marcus Thompson', email: 'hr@hrms.com', role: 'HR', department: 'HR', title: 'HR Business Partner', avatar: 'MT' },
   { id: 'u3', name: 'Sarah Williams', email: 'manager@hrms.com', role: 'Manager', department: 'Engineering', title: 'Engineering Manager', avatar: 'SW' },
   { id: 'u4', name: 'James Okafor', email: 'employee@hrms.com', role: 'Employee', department: 'Engineering', title: 'Senior Software Engineer', avatar: 'JO', managerId: 'u3' },
@@ -107,7 +107,7 @@ export const MOCK_USERS: User[] = [
 ];
 
 export const DEMO_ACCOUNTS = [
-  { email: 'admin@hrms.com', password: 'admin123', role: 'Admin' as UserRole },
+  { email: 'admin@hrms.com', password: 'admin123', role: 'HR' as UserRole },
   { email: 'hr@hrms.com', password: 'hr123', role: 'HR' as UserRole },
   { email: 'manager@hrms.com', password: 'manager123', role: 'Manager' as UserRole },
   { email: 'employee@hrms.com', password: 'employee123', role: 'Employee' as UserRole },
@@ -185,7 +185,7 @@ export const MOCK_COMPETENCIES: Competency[] = [
 export const MOCK_REVIEWS: Review[] = [
   {
     id: 'r1', employeeId: 'u4', employeeName: 'James Okafor', reviewerId: 'u3', reviewerName: 'Sarah Williams',
-    period: 'H2 2024', status: 'Completed', overallScore: 4.2,
+    period: 'Annual', status: 'Completed', overallScore: 4.2,
     goals: [
       { id: 'g1', title: 'Lead microservices migration', description: 'Migrate monolith to microservices', progress: 90, dueDate: '2024-12-31', status: 'Completed', weight: 40 },
       { id: 'g2', title: 'Mentor junior engineers', description: 'Provide weekly 1:1s and code reviews', progress: 100, dueDate: '2024-12-31', status: 'Completed', weight: 30 },
@@ -203,7 +203,7 @@ export const MOCK_REVIEWS: Review[] = [
   },
   {
     id: 'r2', employeeId: 'u4', employeeName: 'James Okafor', reviewerId: 'u3', reviewerName: 'Sarah Williams',
-    period: 'H1 2024', status: 'Acknowledged', overallScore: 3.8,
+    period: 'Mid-Year', status: 'Acknowledged', overallScore: 3.8,
     goals: [
       { id: 'g4', title: 'API gateway implementation', description: 'Design and implement API gateway', progress: 100, dueDate: '2024-06-30', status: 'Completed', weight: 50 },
       { id: 'g5', title: 'Code quality improvement', description: 'Achieve >80% test coverage', progress: 85, dueDate: '2024-06-30', status: 'Completed', weight: 50 },
@@ -220,7 +220,7 @@ export const MOCK_REVIEWS: Review[] = [
   },
   {
     id: 'r3', employeeId: 'u5', employeeName: 'Priya Sharma', reviewerId: 'u3', reviewerName: 'Sarah Williams',
-    period: 'H2 2024', status: 'In Progress', overallScore: 0,
+    period: 'Annual', status: 'In Progress', overallScore: 0,
     goals: [
       { id: 'g6', title: 'React performance optimization', description: 'Reduce bundle size by 30%', progress: 60, dueDate: '2024-12-31', status: 'In Progress', weight: 50 },
       { id: 'g7', title: 'Design system contribution', description: 'Contribute 5 reusable components', progress: 40, dueDate: '2024-12-31', status: 'In Progress', weight: 50 },
@@ -236,7 +236,7 @@ export const MOCK_REVIEWS: Review[] = [
   },
   {
     id: 'r4', employeeId: 'u6', employeeName: 'Daniel Park', reviewerId: 'u3', reviewerName: 'Sarah Williams',
-    period: 'H2 2024', status: 'Draft', overallScore: 0,
+    period: 'Annual', status: 'Draft', overallScore: 0,
     goals: [
       { id: 'g8', title: 'Accessibility audit', description: 'WCAG 2.1 AA compliance', progress: 25, dueDate: '2024-12-31', status: 'In Progress', weight: 60 },
       { id: 'g9', title: 'Component library', description: 'Document all shared components', progress: 10, dueDate: '2024-12-31', status: 'Not Started', weight: 40 },
@@ -310,10 +310,6 @@ export const MOCK_FEEDBACK: FeedbackLog[] = [
 ];
 
 export const PERFORMANCE_HISTORY = [
-  { period: 'H1 2022', score: 3.2 },
-  { period: 'H2 2022', score: 3.4 },
-  { period: 'H1 2023', score: 3.6 },
-  { period: 'H2 2023', score: 3.7 },
-  { period: 'H1 2024', score: 3.8 },
-  { period: 'H2 2024', score: 4.2 },
+  { period: 'Mid-Year', score: 3.8 },
+  { period: 'Annual', score: 4.2 },
 ];
